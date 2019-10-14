@@ -44,11 +44,9 @@ namespace Shadowsocks.Controller
             }
         }
 
-        public static string GetString(string key)
+        public static string GetString(string key, params object[] args)
         {
-            return _strings.ContainsKey(key)
-                ? _strings[key]
-                : key;
+            return string.Format(_strings.TryGetValue(key, out var value) ? value : key, args);
         }
     }
 }

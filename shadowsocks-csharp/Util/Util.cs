@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Microsoft.Win32;
 using Shadowsocks.Controller;
+using Shadowsocks.Model;
 
 namespace Shadowsocks.Util
 {
@@ -32,11 +33,18 @@ namespace Shadowsocks.Util
         {
             if (_tempPath == null)
             {
+                bool isPortableMode = Configuration.Load().portableMode;
                 try
                 {
-                    Directory.CreateDirectory(Path.Combine(Application.StartupPath, "ss_win_temp"));
-                    // don't use "/", it will fail when we call explorer /select xxx/ss_win_temp\xxx.log
-                    _tempPath = Path.Combine(Application.StartupPath, "ss_win_temp");
+                    if (isPortableMode)
+                    {
+                        _tempPath = Directory.CreateDirectory("ss_win_temp").FullName;
+                        // don't use "/", it will fail when we call explorer /select xxx/ss_win_temp\xxx.log
+                    }
+                    else
+                    {
+                        _tempPath = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), @"Shadowsocks\ss_win_temp_" + Application.ExecutablePath.GetHashCode())).FullName;
+                    }
                 }
                 catch (Exception e)
                 {
@@ -45,6 +53,38 @@ namespace Shadowsocks.Util
                 }
             }
             return _tempPath;
+        }
+
+        public enum WindowsThemeMode { Dark, Light }
+
+        // Support on Windows 10 1903+
+        public static WindowsThemeMode GetWindows10SystemThemeSetting(bool isVerbose)
+        {
+            WindowsThemeMode themeMode = WindowsThemeMode.Dark;
+            try
+            {
+                RegistryKey reg_ThemesPersonalize = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", false);
+                if (reg_ThemesPersonalize.GetValue("SystemUsesLightTheme") != null)
+                {
+                    if ((int)(reg_ThemesPersonalize.GetValue("SystemUsesLightTheme")) == 0) // 0:dark mode, 1:light mode
+                        themeMode = WindowsThemeMode.Dark;
+                    else
+                        themeMode = WindowsThemeMode.Light;
+                }
+                else
+                {
+                    throw new Exception("Reg-Value SystemUsesLightTheme not found.");
+                }
+            }
+            catch
+            {
+                if (isVerbose)
+                {
+                    Logging.Info(
+                            $"Cannot get Windows 10 system theme mode, return default value 0 (dark mode).");
+                }
+            }
+            return themeMode;
         }
 
         // return a full path with filename combined which pointed to the temporary directory
